@@ -147,6 +147,14 @@ public class DiscordSettings implements IConf {
         return config.getBoolean("show-name", false);
     }
 
+    public boolean isVanishFakeJoinLeave() {
+        return config.getBoolean("vanish-fake-join-leave", true);
+    }
+
+    public boolean isVanishHideMessages() {
+        return config.getBoolean("vanish-hide-messages", true);
+    }
+
     // General command settings
 
     public boolean isCommandEnabled(String command) {

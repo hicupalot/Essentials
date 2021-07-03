@@ -5,6 +5,7 @@ import com.earth2me.essentials.utils.DateUtil;
 import com.earth2me.essentials.utils.FormatUtil;
 import net.ess3.api.events.AfkStatusChangeEvent;
 import net.ess3.api.events.MuteStatusChangeEvent;
+import net.ess3.api.events.VanishStatusChangeEvent;
 import net.essentialsx.api.v2.events.AsyncUserDataLoadEvent;
 import net.essentialsx.api.v2.events.discord.DiscordChatMessageEvent;
 import net.essentialsx.api.v2.events.discord.DiscordMessageEvent;
@@ -13,6 +14,7 @@ import net.essentialsx.discord.JDADiscordService;
 import net.essentialsx.discord.util.DiscordUtil;
 import net.essentialsx.discord.util.MessageUtil;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -104,7 +106,7 @@ public class BukkitListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onJoin(AsyncUserDataLoadEvent event) {
         // Delay join to let nickname load
-        if (event.getJoinMessage() != null) {
+        if (event.getJoinMessage() != null && (!jda.getSettings().isVanishHideMessages() || !event.getUser().isHidden())) {
             sendDiscordMessage(MessageType.DefaultTypes.JOIN,
                     MessageUtil.formatMessage(jda.getSettings().getJoinFormat(event.getUser().getBase()),
                             MessageUtil.sanitizeDiscordMarkdown(event.getUser().getName()),
@@ -119,7 +121,7 @@ public class BukkitListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuit(PlayerQuitEvent event) {
-        if (event.getQuitMessage() != null) {
+        if (event.getQuitMessage() != null && (!jda.getSettings().isVanishHideMessages() || !jda.getPlugin().getEss().getUser(event.getPlayer()).isHidden())) {
             sendDiscordMessage(MessageType.DefaultTypes.LEAVE,
                     MessageUtil.formatMessage(jda.getSettings().getQuitFormat(event.getPlayer()),
                             MessageUtil.sanitizeDiscordMarkdown(event.getPlayer().getName()),
@@ -133,7 +135,38 @@ public class BukkitListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onVanishStatusChange(VanishStatusChangeEvent event) {
+        if (!jda.getSettings().isVanishFakeJoinLeave()) {
+            return;
+        }
+        if (event.getValue()) {
+            sendDiscordMessage(MessageType.DefaultTypes.LEAVE,
+                    MessageUtil.formatMessage(jda.getSettings().getQuitFormat(event.getAffected().getBase()),
+                            MessageUtil.sanitizeDiscordMarkdown(event.getAffected().getName()),
+                            MessageUtil.sanitizeDiscordMarkdown(event.getAffected().getDisplayName()),
+                            MessageUtil.sanitizeDiscordMarkdown(ChatColor.YELLOW + event.getAffected().getName() + " left the game")),
+                    false,
+                    jda.getSettings().isShowAvatar() ? AVATAR_URL.replace("{uuid}", event.getAffected().getBase().getUniqueId().toString()) : null,
+                    jda.getSettings().isShowName() ? event.getAffected().getName() : null,
+                    event.getAffected().getBase().getUniqueId());
+            return;
+        }
+        sendDiscordMessage(MessageType.DefaultTypes.JOIN,
+                MessageUtil.formatMessage(jda.getSettings().getJoinFormat(event.getAffected().getBase()),
+                        MessageUtil.sanitizeDiscordMarkdown(event.getAffected().getName()),
+                        MessageUtil.sanitizeDiscordMarkdown(event.getAffected().getDisplayName()),
+                        MessageUtil.sanitizeDiscordMarkdown(ChatColor.YELLOW + event.getAffected().getName() + " joined the game")),
+                false,
+                jda.getSettings().isShowAvatar() ? AVATAR_URL.replace("{uuid}", event.getAffected().getBase().getUniqueId().toString()) : null,
+                jda.getSettings().isShowName() ? event.getAffected().getName() : null,
+                event.getAffected().getBase().getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDeath(PlayerDeathEvent event) {
+        if (jda.getSettings().isVanishHideMessages() && jda.getPlugin().getEss().getUser(event.getEntity()).isHidden()) {
+            return;
+        }
         sendDiscordMessage(MessageType.DefaultTypes.DEATH,
                 MessageUtil.formatMessage(jda.getSettings().getDeathFormat(event.getEntity()),
                         MessageUtil.sanitizeDiscordMarkdown(event.getEntity().getName()),
@@ -147,6 +180,10 @@ public class BukkitListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onAfk(AfkStatusChangeEvent event) {
+        if (jda.getSettings().isVanishHideMessages() && event.getAffected().isHidden()) {
+            return;
+        }
+
         final MessageFormat format;
         if (event.getValue()) {
             format = jda.getSettings().getAfkFormat(event.getAffected().getBase());
@@ -166,6 +203,9 @@ public class BukkitListener implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onKick(PlayerKickEvent event) {
+        if (jda.getSettings().isVanishHideMessages() && jda.getPlugin().getEss().getUser(event.getPlayer()).isHidden()) {
+            return;
+        }
         sendDiscordMessage(MessageType.DefaultTypes.KICK,
                 MessageUtil.formatMessage(jda.getSettings().getKickFormat(),
                         MessageUtil.sanitizeDiscordMarkdown(event.getPlayer().getName()),
